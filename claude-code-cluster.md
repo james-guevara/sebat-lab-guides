@@ -68,7 +68,7 @@ claude -p "Analyze the VCF files in this directory" --allowedTools "Read,Grep,Ba
 ```bash
 #!/bin/bash
 #SBATCH --account=ddp195
-#SBATCH --partition=shared
+#SBATCH --partition=ind-shared
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=2

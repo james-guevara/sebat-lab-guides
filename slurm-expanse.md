@@ -2,6 +2,23 @@
 
 Job submission templates and tips for SDSC Expanse.
 
+## Quick Test
+
+New to the cluster? Run this first — it grabs a 1-hour interactive shell on 4 cores
+and confirms your account, partition, and allocation all work:
+
+```bash
+srun --partition=ind-shared --account=ddp195 --time 01:00:00 \
+     --nodes=1 --ntasks-per-node=1 --cpus-per-task 4 \
+     --export=ALL --pty /bin/bash
+```
+
+If you get a shell prompt on a compute node (`exp-#-##`), you're set. Type `exit` to
+release it — don't leave interactive jobs idling, they burn allocation.
+
+If it hangs in `PD` (pending), the partition is busy; if it errors out, check that
+`--account=ddp195` is spelled right and that you're on the allocation.
+
 ## Required Directives
 
 Every job script needs these:
@@ -9,7 +26,7 @@ Every job script needs these:
 ```bash
 #!/bin/bash
 #SBATCH --account=ddp195
-#SBATCH --partition=shared
+#SBATCH --partition=ind-shared
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=4
@@ -21,17 +38,37 @@ Every job script needs these:
 # Your commands here
 ```
 
-**Always include**: `--account=ddp195`, `--nodes`, `--ntasks-per-node`, `--output`, `--error`
+**Always include**: `--account=ddp195`, `--partition=ind-shared`, `--nodes`, `--ntasks-per-node`, `--output`, `--error`
+
+> **Use `ind-shared`, not `shared`.** Our `ddp195` jobs go to the `ind-*` (institutional) partitions. Submitting to `shared` is the most common mistake in this lab.
 
 ## Partitions
 
-| Partition | Max Time | Max Nodes | Use Case |
-|-----------|----------|-----------|----------|
-| `shared` | 48 hours | 1 (partial) | Most jobs - you share the node |
-| `compute` | 48 hours | 32 | Large parallel jobs needing full nodes |
-| `gpu-shared` | 48 hours | 1 | GPU jobs (partial node) |
-| `gpu` | 48 hours | 4 | Multi-GPU jobs |
-| `large-shared` | 48 hours | 1 | High-memory jobs (up to 2TB RAM) |
+`ddp195` can submit to **exactly four partitions** — all on the lab's institutional
+nodes (`exp-15-*`). Everything below is verified against the live scheduler
+(2026-07-31).
+
+| Partition | Max Time | Cores/job | Max Mem/job | Use Case |
+|-----------|----------|-----------|-------------|----------|
+| `ind-shared` | 2 days | 127 (1 node) | 249325M (~243G) | **Default for most jobs** - you share the node |
+| `ind-compute` | 2 days | 2048 (16 nodes) | full node (~251G/node) | Full-node parallel jobs |
+| `ind-gpu-shared` | 2 days | 160, 16 GPUs | 376832M (~368G) | GPU jobs (partial node) |
+| `ind-gpu` | 2 days | 80 (2 nodes), 8 GPUs | full node | Multi-GPU, whole nodes |
+
+Node specs: `ind-shared`/`ind-compute` = 128 cores, 257400M. `ind-gpu*` = 40 cores, 385500M.
+
+### Partitions you CANNOT use
+
+Submitting to any of these fails with `Project not found allocation failure`:
+
+`shared` &nbsp; `compute` &nbsp; `gpu` &nbsp; `gpu-shared` &nbsp; `large-shared` &nbsp; `debug` &nbsp; `preempt`
+
+Note that `shared` is the cluster **default** partition — so if you forget
+`--partition`, your job is rejected. Always set it explicitly.
+
+There is no `ind-large-shared`; the lab has no access to the 2TB `large-shared` nodes.
+Your memory ceiling is **249325M on `ind-shared`**. Request more and you get
+`Requested node configuration is not available`.
 
 ## Common Templates
 
@@ -40,7 +77,7 @@ Every job script needs these:
 ```bash
 #!/bin/bash
 #SBATCH --account=ddp195
-#SBATCH --partition=shared
+#SBATCH --partition=ind-shared
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
@@ -57,7 +94,7 @@ python my_script.py
 ```bash
 #!/bin/bash
 #SBATCH --account=ddp195
-#SBATCH --partition=shared
+#SBATCH --partition=ind-shared
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
@@ -72,14 +109,18 @@ bcftools view -@ $SLURM_CPUS_PER_TASK input.vcf.gz -o output.vcf.gz
 
 ### High-memory job
 
+We have no `large-shared` access, so the most memory you can get is one full
+`ind-shared` node: `--mem=249325M`. Use `M` units, not `G` — `--mem=243G` is
+248832M and fits, but `--mem=244G` silently exceeds the cap.
+
 ```bash
 #!/bin/bash
 #SBATCH --account=ddp195
-#SBATCH --partition=large-shared
+#SBATCH --partition=ind-shared
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=256G
+#SBATCH --mem=249325M
 #SBATCH --time=8:00:00
 #SBATCH --output=job_%j.out
 #SBATCH --error=job_%j.err
@@ -88,12 +129,15 @@ bcftools view -@ $SLURM_CPUS_PER_TASK input.vcf.gz -o output.vcf.gz
 gatk GenotypeGVCFs ...
 ```
 
+If your job genuinely needs more than 243G, it needs restructuring (shard by
+chromosome or region) — there is no partition in our allocation that will run it.
+
 ### Array job (process many files)
 
 ```bash
 #!/bin/bash
 #SBATCH --account=ddp195
-#SBATCH --partition=shared
+#SBATCH --partition=ind-shared
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=4
@@ -115,7 +159,7 @@ python process.py $FILE
 ```bash
 #!/bin/bash
 #SBATCH --account=ddp195
-#SBATCH --partition=gpu-shared
+#SBATCH --partition=ind-gpu-shared
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
@@ -129,6 +173,10 @@ module load gpu
 python train_model.py
 ```
 
+You **must** request at least one GPU on the `ind-gpu*` partitions. Omitting
+`--gpus` fails with `QOSMinGRES allocation failure`, which is an unhelpful way of
+saying "you forgot `--gpus=1`".
+
 ## Quick Commands
 
 ```bash
@@ -138,21 +186,49 @@ sbatch job.sh
 # Check your jobs
 squeue -u $USER
 
-# Cancel job
+# Cancel job - ALWAYS by explicit job ID
 scancel <job_id>
-
-# Cancel all your jobs
-scancel -u $USER
 
 # Job info after completion
 sacct -j <job_id> --format=JobID,Elapsed,MaxRSS,State
 
-# Interactive session (2 hours, 4 CPUs, 16GB)
-srun --account=ddp195 --partition=shared --nodes=1 --ntasks-per-node=1 \
-     --cpus-per-task=4 --mem=16G --time=2:00:00 --pty bash
+# Interactive session (1 hour, 4 CPUs)
+srun --account=ddp195 --partition=ind-shared --nodes=1 --ntasks-per-node=1 \
+     --cpus-per-task=4 --time=01:00:00 --export=ALL --pty /bin/bash
 ```
 
 ## Tips
+
+### Never cancel jobs by filter
+
+`scancel` accepts filters like `-u <user>` and `-n <name>`. Don't use them. They
+match more than you expect — interactive sessions, someone else's array job you
+inherited, a pipeline that's 20 hours in — and there is no undo and no confirmation
+prompt.
+
+```bash
+scancel 52832213        # good: one explicit job ID
+scancel -u $USER        # NO: kills every job you have, including interactive shells
+scancel -n bash         # NO: matches every interactive session by that name
+```
+
+Check first with `squeue -u $USER`, then cancel the specific IDs you meant.
+
+### Dry-run a job before you queue it
+
+`--test-only` validates account, partition, and resource limits and reports when the
+job *would* start. Nothing is submitted, nothing is charged:
+
+```bash
+sbatch --test-only --account=ddp195 --partition=ind-shared \
+       --nodes=1 --ntasks-per-node=1 --cpus-per-task=4 --mem=16G \
+       --time=01:00:00 --wrap="hostname"
+# sbatch: Job 12345678 to start at 2026-07-31T14:29:56 using 4 processors
+#         on nodes exp-15-36 in partition ind-shared
+```
+
+Any other output is an error worth reading before you burn a real submission. Works
+on a script too: `sbatch --test-only job.sh`.
 
 ### Use variables for thread count
 
@@ -183,7 +259,7 @@ Use this to tune future job requests.
 ### Sbatch wrap for quick jobs
 
 ```bash
-sbatch --account=ddp195 --partition=shared --nodes=1 --ntasks-per-node=1 \
+sbatch --account=ddp195 --partition=ind-shared --nodes=1 --ntasks-per-node=1 \
        --cpus-per-task=4 --mem=16G --time=1:00:00 \
        --wrap="python my_script.py"
 ```

@@ -36,8 +36,8 @@ mkdir -p $NXF_TEMP
 
 ```bash
 # Get an interactive session first
-srun --account=ddp195 --partition=shared --nodes=1 --ntasks-per-node=1 \
-     --cpus-per-task=4 --mem=16G --time=2:00:00 --pty bash
+srun --account=ddp195 --partition=ind-shared --nodes=1 --ntasks-per-node=1 \
+     --cpus-per-task=4 --mem=16G --time=2:00:00 --export=ALL --pty /bin/bash
 
 # Activate environment and run
 micromamba activate nf_env
@@ -47,7 +47,7 @@ nextflow run pipeline.nf -c config.nf
 ### Via sbatch (for production)
 
 ```bash
-sbatch --account=ddp195 --partition=shared --nodes=1 --ntasks-per-node=1 \
+sbatch --account=ddp195 --partition=ind-shared --nodes=1 --ntasks-per-node=1 \
        --cpus-per-task=4 --mem=16G --time=24:00:00 \
        --output=nf_%j.out --error=nf_%j.err \
        --wrap='eval "$(micromamba shell hook --shell bash)" && micromamba activate nf_env && nextflow run pipeline.nf -c config.nf'
