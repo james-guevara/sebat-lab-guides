@@ -332,14 +332,27 @@ One link, one resumable download, and it keeps the directory structure. This is
 the practical answer up to a few hundred GB going to one person. Past that, or for
 ongoing access, use a dedicated bucket.
 
+**Resuming works**, so a dropped transfer isn't a disaster. If a download dies
+partway, rerun with `-C -` and it picks up where it left off:
+
+```bash
+curl -C - -O "PASTE_THE_URL_HERE"
+```
+
+Verified on a partial file: the server advertises `Accept-Ranges: bytes`, returns
+`206` for the range, fetches only the missing bytes, and the completed file's
+checksum matches the original on Expanse. If the URL has since expired, generate a
+fresh one — resuming against the new URL still works, because the partial file on
+their end is unaffected.
+
 Caveats:
 
 - Anyone with the link can download it during the validity window — treat the URL
   itself as the credential and don't post it publicly.
 - The link stops working if the file moves or is deleted.
-- Resuming a partial download (`curl -C -`) relies on HTTP range requests, which
-  haven't been tested against this server. Verify on a throwaway file before
-  depending on it for a very large transfer.
+- **`curl -I` on a presigned URL returns `403`** — this is expected, not a broken
+  link. The signature covers the HTTP method, so a `HEAD` against a URL signed for
+  `GET` fails. Test a link with `curl -o /dev/null -w '%{http_code}\n'` instead.
 - If they need longer than 7 days, just issue a fresh URL — but if you find
   yourself reissuing repeatedly, switch to a bucket.
 
@@ -375,6 +388,10 @@ Tested August 2026 against the live server:
   Tested end to end, including a `tar.gz` bundle that unpacked intact on the
   receiving side. Editing a valid URL to point at another object or at the bucket
   root returns `403 SignatureDoesNotMatch`, so the link cannot be widened.
+- Range requests and resume work: `Accept-Ranges: bytes`, `206` on a byte range,
+  and `curl -C -` completes a half-finished download with a checksum matching the
+  source file. A `HEAD` (`curl -I`) against a GET-signed URL returns `403`, since
+  the signature covers the method.
 - Server-side metadata under `.minio.sys/buckets/<bucket>/` is only created when
   an object is written **through the S3 API**. Files created with `cp`, and
   objects merely read over S3, produce none.
