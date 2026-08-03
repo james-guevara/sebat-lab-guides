@@ -3,6 +3,25 @@
 How to publish a dataset from Expanse so an outside collaborator can download it
 with standard S3 tools — no Expanse account, no SSH, no VPN needed on their end.
 
+## Is this the right method?
+
+Check this first — S3 is the right answer for outside collaborators, but it's the
+most involved option, since getting keys requires an SDSC ticket.
+
+| Situation | Better option |
+|---|---|
+| They have an Expanse/SDSC account | Don't use S3. Share a directory with an ACL — no keys, no ticket |
+| A handful of files, one-off | Consider a presigned URL (below) — no new bucket, no ticket |
+| Very large or unreliable transfer | [Globus](globus-expanse.md) — resumable and checksummed |
+| External collaborator, many files, or ongoing | **This guide** |
+
+**Presigned URLs** are worth knowing about: `aws s3 presign` uses your *existing*
+bucket keys to generate a time-limited download link for a single object. The
+recipient just clicks it or uses `curl` — no AWS CLI, no credentials, no ticket.
+Expiry is capped at 7 days, and it's one URL per file, so it doesn't scale past a
+few dozen. Note this hasn't been tested against this particular server yet, so
+try it on a throwaway file before relying on it.
+
 ## Why this works
 
 SDSC runs an S3 server (MinIO) on top of our project storage. Files you copy
@@ -35,7 +54,12 @@ pattern, not inventing one.
   consider [Globus](globus-expanse.md) instead.
 - **Anything in the bucket is readable by anyone holding that bucket's key.** Do
   not put controlled-access data (SFARI, dbGaP) in a bucket whose keys will go to
-  someone not approved for it.
+  someone not approved for it. That includes individual-level derived data —
+  per-sample PGS scores or DNM callsets keyed to cohort IDs are still
+  individual-level cohort data. Aggregate/summary output generally isn't.
+- **"We generated it" doesn't lift the cohort's restrictions.** Sequencing data
+  the lab produced itself on SPARK or SSC samples is still SPARK/SSC data. If in
+  doubt, check the data use agreement before creating the bucket, not after.
 
 ## Step 1 — Pick a bucket name
 
@@ -56,7 +80,7 @@ ssh expanse
 
 mkdir /expanse/projects/sebat1/s3/data/smith-lab-data
 
-cp -r /expanse/projects/sebat1/j3guevar/my_results/* \
+cp -r /expanse/projects/sebat1/$USER/my_results/* \
       /expanse/projects/sebat1/s3/data/smith-lab-data/
 
 ls -la /expanse/projects/sebat1/s3/data/smith-lab-data/
