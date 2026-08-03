@@ -113,9 +113,7 @@ Template:
 >    `smith-lab-data` bucket — matching how the existing `broad-data` and
 >    `pennstate-data` buckets are configured. Read-only is fine (or read-write
 >    if I need them to upload data back).
-> 2. Confirm the endpoint URL the collaborator should use for this bucket, and
->    register the bucket server-side if that's needed in addition to creating
->    the directory.
+> 2. Confirm the endpoint URL the collaborator should use for this bucket.
 >
 > Thanks,
 > <your name>
@@ -345,21 +343,25 @@ Tested August 2026 against the live server:
 - Server-side metadata under `.minio.sys/buckets/<bucket>/` is only created when
   an object is written **through the S3 API**. Files created with `cp`, and
   objects merely read over S3, produce none.
+- A bucket with no such metadata is fully functional: `gimena_data` has none, and
+  its key lists it normally while being denied on `sebat`. The directory itself is
+  the bucket.
 
-One thing still unconfirmed: whether a plain `mkdir` is sufficient to make a new
-bucket usable, or whether SDSC must also register it server-side.
+**The directory is the bucket — no server-side registration step is needed.**
+This was tested directly: the `gimena_data` bucket has *no* metadata under
+`.minio.sys/buckets/`, and its key nonetheless lists it fine (and is correctly
+denied on `sebat`). So `.minio.sys/buckets/` is per-object metadata, not a bucket
+registry, and its absence says nothing about whether a bucket works. That matches
+the backend in use: `format.json` reports `"format":"fs"`, MinIO's filesystem
+mode, where a bucket is a top-level directory under the data root.
 
-This turned out to be genuinely untestable from our account. Both obvious probes
-return the same `AccessDenied` for a bucket that exists and one that doesn't —
-authenticated requests with a bucket-scoped key, and unauthenticated requests —
-so there is no way to distinguish "not registered" from "not authorized". Proving
-it would need a key for a bucket that has no server-side metadata, or a direct
-answer from SDSC. This is why Step 3 asks them to confirm.
+So creating the folder is genuinely all there is to it. **What `mkdir` does not do
+is create credentials** — that part always needs SDSC, which is the real reason
+for the ticket in Step 3.
 
-The evidence leans toward `mkdir` being sufficient. MinIO is running its
-filesystem backend (`format.json` reports `"format":"fs"`), where a bucket is
-essentially a top-level directory under the data root. Metadata under
-`.minio.sys/buckets/` only appears once something is written through the S3 API,
-so its absence for `gimena_data`, `kun-data`, and `refs` is expected regardless of
-how they were created and is *not* evidence that they're broken. What `mkdir`
-definitely does **not** do is create credentials — that part always needs SDSC.
+The one residual unknown is narrow: we could never watch a brand-new top-level
+directory be served, because that needs a key we don't have. But the server
+demonstrably reads the filesystem live — a file created with `cp` inside an
+existing bucket appears over S3 immediately — so there's no reason to expect a new
+directory to behave differently. If a new bucket ever does fail to appear, ask
+SDSC to register it; otherwise assume it just works.
