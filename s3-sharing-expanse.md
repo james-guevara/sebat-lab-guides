@@ -5,19 +5,23 @@ with standard S3 tools — no Expanse account, no SSH, no VPN needed on their en
 
 ## Is this the right method?
 
-Check this first — S3 is the right answer for outside collaborators, but it's the
-most involved option, since getting keys requires an SDSC ticket.
+Check this first. A dedicated bucket is the most involved option, because the
+access keys must be created by SDSC — so start by asking whether you need one.
 
-| Situation | Better option |
+| Situation | Use this |
 |---|---|
-| They have an Expanse/SDSC account | Don't use S3. Share a directory with an ACL — no keys, no ticket |
-| A handful of files, one-off | Consider a presigned URL (below) — no new bucket, no ticket |
+| They have an Expanse/SDSC account | A directory ACL — no keys, no ticket, no S3 |
+| **One-off transfer, or few enough files to tar up** | **[Presigned URL](#recommended-for-one-off-transfers-presigned-urls) — no ticket, works today** |
 | Very large or unreliable transfer | [Globus](globus-expanse.md) — resumable and checksummed |
-| External collaborator, many files, or ongoing | **This guide** |
+| Many files, ongoing or self-service access, or needed for more than 7 days | A dedicated bucket — **the rest of this guide** |
 
-**Presigned URLs** are the quickest option and need no SDSC involvement at all —
-see [the section below](#alternative-presigned-urls-no-ticket-needed). Tested
-working against this server.
+**Try a presigned URL first.** It uses keys you already have, so SDSC isn't
+involved at all and you can do it in the next five minutes. The dedicated-bucket
+route below is for when a link per file stops being practical.
+
+The only thing that genuinely requires an SDSC ticket is **creating the access
+keys** for a new bucket. Creating the bucket itself is just `mkdir` — see
+[Verified behaviour](#verified-behaviour).
 
 ## Why this works
 
@@ -107,13 +111,10 @@ Template:
 > I've created a new folder `smith-lab-data` there and would like to share it
 > with an external collaborator.
 >
-> Could you please:
->
-> 1. Create an S3 access key / secret key pair scoped to **only** the
->    `smith-lab-data` bucket — matching how the existing `broad-data` and
->    `pennstate-data` buckets are configured. Read-only is fine (or read-write
->    if I need them to upload data back).
-> 2. Confirm the endpoint URL the collaborator should use for this bucket.
+> Could you please create an S3 access key / secret key pair scoped to **only**
+> the `smith-lab-data` bucket — matching how the existing `broad-data` and
+> `pennstate-data` buckets are configured? Read-only is fine (or read-write if I
+> need them to upload data back).
 >
 > Thanks,
 > <your name>
@@ -128,12 +129,14 @@ chmod 600 /expanse/projects/sebat1/s3/smith-lab-data.txt
 
 ## Step 4 — Verify it works before you send anything
 
-> **On endpoints:** the only endpoint confirmed working is
-> `https://sebat.s3.sdsc.edu`, with **path-style** addressing. Per-bucket
-> hostnames like `https://broad-data.s3.sdsc.edu` resolve in DNS but return
-> `503 Service Unavailable`, so don't assume `<your-bucket>.s3.sdsc.edu` works.
-> Bare `https://s3.sdsc.edu` also 503s. Use whatever hostname SDSC confirms in
-> Step 3; the commands below assume the path-style form.
+> **On endpoints:** always use `https://sebat.s3.sdsc.edu` with **path-style**
+> addressing, whatever your bucket is called. That hostname is not specific to the
+> `sebat` bucket — it serves every bucket in the project, verified by reaching
+> `gimena_data` through it with that bucket's own key.
+>
+> Do **not** assume `<your-bucket>.s3.sdsc.edu` works. Per-bucket hostnames like
+> `https://broad-data.s3.sdsc.edu` resolve in DNS but return
+> `503 Service Unavailable`, and bare `https://s3.sdsc.edu` 503s too.
 
 Set up a profile with path-style addressing. In `~/.aws/config`:
 
@@ -271,14 +274,15 @@ s3 =
 
 ---
 
-## Alternative: presigned URLs (no ticket needed)
+## Recommended for one-off transfers: presigned URLs
 
-If you just need to get a few files to someone, this is far less work than a new
-bucket. A presigned URL is a normal HTTPS link with a time-limited signature
-embedded in it. It uses **your existing keys** — the recipient needs no
-credentials, no AWS CLI, and no SDSC account, and you need no ticket.
+For most sharing requests this is all you need, and it's much less work than a
+dedicated bucket. A presigned URL is an ordinary HTTPS link with a time-limited
+signature embedded in it. It uses **keys you already have**, so there's no ticket,
+and the recipient needs no credentials, no AWS CLI, and no SDSC account.
 
-Put the file somewhere in a bucket you already have keys for, then:
+The file has to live in a bucket you already hold keys for — in practice, put it
+somewhere under `/expanse/projects/sebat1/s3/data/sebat/`. Then:
 
 ```bash
 aws --profile sebat s3 presign s3://sebat/path/to/file.tsv \
@@ -303,13 +307,39 @@ prints a URL that fails with `HTTP 400 AuthorizationQueryParametersError` when
 anyone tries to use it. Confirmed: `604800` works, `604801` produces a
 dead link. If you need longer than a week, use a bucket and keys instead.
 
+**Staging inside `sebat` is safe.** The signature grants access to that one object
+and nothing else — not the bucket, not the rest of the ~22 TB. You're handing out a
+link, never a key. (Standard data-use rules still apply to whatever is *in* the
+file; see [Before you start](#before-you-start).)
+
+### Many files: tar them into one object
+
+There's no way to presign a directory, and the recipient can't browse a listing —
+it's strictly one URL per object. So rather than sending twenty links, send one:
+
+```bash
+cd /expanse/projects/sebat1/$USER
+mkdir -p /expanse/projects/sebat1/s3/data/sebat/outgoing
+tar czf /expanse/projects/sebat1/s3/data/sebat/outgoing/results-2026-08.tar.gz results/
+
+aws --profile sebat s3 presign s3://sebat/outgoing/results-2026-08.tar.gz \
+    --expires-in 604800 --endpoint-url https://sebat.s3.sdsc.edu
+```
+
+One link, one resumable download, and it keeps the directory structure. This is
+the practical answer up to a few hundred GB going to one person. Past that, or for
+ongoing access, use a dedicated bucket.
+
 Caveats:
 
-- One URL per file. Fine for a handful, painful past a few dozen.
-- Anyone with the link can download it during the validity window — treat the
-  URL itself as the credential and don't post it publicly.
+- Anyone with the link can download it during the validity window — treat the URL
+  itself as the credential and don't post it publicly.
 - The link stops working if the file moves or is deleted.
-- It grants access to that one object only, not the bucket.
+- Resuming a partial download (`curl -C -`) relies on HTTP range requests, which
+  haven't been tested against this server. Verify on a throwaway file before
+  depending on it for a very large transfer.
+- If they need longer than 7 days, just issue a fresh URL — but if you find
+  yourself reissuing repeatedly, switch to a bucket.
 
 ## Housekeeping
 
