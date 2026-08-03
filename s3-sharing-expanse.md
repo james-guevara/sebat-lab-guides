@@ -15,12 +15,9 @@ most involved option, since getting keys requires an SDSC ticket.
 | Very large or unreliable transfer | [Globus](globus-expanse.md) — resumable and checksummed |
 | External collaborator, many files, or ongoing | **This guide** |
 
-**Presigned URLs** are worth knowing about: `aws s3 presign` uses your *existing*
-bucket keys to generate a time-limited download link for a single object. The
-recipient just clicks it or uses `curl` — no AWS CLI, no credentials, no ticket.
-Expiry is capped at 7 days, and it's one URL per file, so it doesn't scale past a
-few dozen. Note this hasn't been tested against this particular server yet, so
-try it on a throwaway file before relying on it.
+**Presigned URLs** are the quickest option and need no SDSC involvement at all —
+see [the section below](#alternative-presigned-urls-no-ticket-needed). Tested
+working against this server.
 
 ## Why this works
 
@@ -276,6 +273,46 @@ s3 =
 
 ---
 
+## Alternative: presigned URLs (no ticket needed)
+
+If you just need to get a few files to someone, this is far less work than a new
+bucket. A presigned URL is a normal HTTPS link with a time-limited signature
+embedded in it. It uses **your existing keys** — the recipient needs no
+credentials, no AWS CLI, and no SDSC account, and you need no ticket.
+
+Put the file somewhere in a bucket you already have keys for, then:
+
+```bash
+aws --profile sebat s3 presign s3://sebat/path/to/file.tsv \
+    --expires-in 604800 \
+    --endpoint-url https://sebat.s3.sdsc.edu
+```
+
+That prints a long URL. Send it. The recipient runs:
+
+```bash
+curl -O "PASTE_THE_URL_HERE"
+```
+
+Verified against the live server: the URL returns HTTP 200 with the correct
+content and no credentials, while the same path without the signature returns
+`403 AccessDenied`. So the signature — not public access — is what grants the
+download.
+
+**Watch the expiry limit.** The maximum is 7 days (`604800` seconds), enforced by
+the server. The AWS CLI does **not** warn you if you exceed it — it happily
+prints a URL that fails with `HTTP 400 AuthorizationQueryParametersError` when
+anyone tries to use it. Confirmed: `604800` works, `604801` produces a
+dead link. If you need longer than a week, use a bucket and keys instead.
+
+Caveats:
+
+- One URL per file. Fine for a handful, painful past a few dozen.
+- Anyone with the link can download it during the validity window — treat the
+  URL itself as the credential and don't post it publicly.
+- The link stops working if the file moves or is deleted.
+- It grants access to that one object only, not the bucket.
+
 ## Housekeeping
 
 - **These keys don't expire.** When the collaboration ends, email SDSC to revoke
@@ -301,18 +338,28 @@ Tested August 2026 against the live server:
 - `CreateBucket` via the API is denied, so new buckets need an SDSC ticket.
 - Our bucket-scoped key returns `AccessDenied` for all other buckets, including
   names that don't exist (S3 masks existence rather than returning
-  `NoSuchBucket`).
+  `NoSuchBucket`). Unauthenticated requests behave the same way, so there is no
+  way to probe whether a given bucket exists from outside.
+- Presigned URLs work: HTTP 200 with no credentials, `403` without the
+  signature, and a server-enforced 7-day maximum that the CLI does not warn about.
+- Server-side metadata under `.minio.sys/buckets/<bucket>/` is only created when
+  an object is written **through the S3 API**. Files created with `cp`, and
+  objects merely read over S3, produce none.
 
-One thing still unconfirmed: whether a plain `mkdir` is sufficient to register a
-new bucket server-side, or whether SDSC must also create it. The existing buckets
-show a mix — `sebat`, `broad-data`, and `pennstate-data` have server-side
-metadata under `.minio.sys/buckets/`, while `gimena_data`, `kun-data`, and `refs`
-do not, suggesting those were made with `mkdir` alone. It couldn't be tested from
-our account because a bucket-scoped key can't see other buckets either way. This
-is why Step 3 asks SDSC to confirm.
+One thing still unconfirmed: whether a plain `mkdir` is sufficient to make a new
+bucket usable, or whether SDSC must also register it server-side.
 
-The evidence leans toward `mkdir` being sufficient: server-side metadata only
-appears for prefixes that have been written *through the S3 API*, and plenty of
-directories that are served fine over S3 have no metadata at all. So the absence
-of metadata for `kun-data` and friends is expected regardless of how they were
-created, and isn't evidence that they're broken.
+This turned out to be genuinely untestable from our account. Both obvious probes
+return the same `AccessDenied` for a bucket that exists and one that doesn't —
+authenticated requests with a bucket-scoped key, and unauthenticated requests —
+so there is no way to distinguish "not registered" from "not authorized". Proving
+it would need a key for a bucket that has no server-side metadata, or a direct
+answer from SDSC. This is why Step 3 asks them to confirm.
+
+The evidence leans toward `mkdir` being sufficient. MinIO is running its
+filesystem backend (`format.json` reports `"format":"fs"`), where a bucket is
+essentially a top-level directory under the data root. Metadata under
+`.minio.sys/buckets/` only appears once something is written through the S3 API,
+so its absence for `gimena_data`, `kun-data`, and `refs` is expected regardless of
+how they were created and is *not* evidence that they're broken. What `mkdir`
+definitely does **not** do is create credentials — that part always needs SDSC.
