@@ -10,7 +10,7 @@ Guides and templates for working with SDSC clusters (Expanse, TSCC), AWS, and AI
 | [SLURM on Expanse](slurm-expanse.md) | Job submission templates and tips |
 | [Nextflow on Expanse](nextflow-expanse.md) | Running Nextflow pipelines on the cluster |
 | [Globus Setup](globus-expanse.md) | File transfers with Globus CLI |
-| [Sharing Data via S3](s3-sharing-expanse.md) | Publish a folder as an S3 bucket for outside collaborators |
+| [Sharing Data via S3](s3-sharing-expanse.md) | Send data to outside collaborators — presigned links, or a bucket with scoped keys |
 | [Claude Code on Clusters](claude-code-cluster.md) | Installing and using Claude Code via SSH |
 
 ## For Claude Code Users
