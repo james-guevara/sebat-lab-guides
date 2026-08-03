@@ -307,9 +307,11 @@ prints a URL that fails with `HTTP 400 AuthorizationQueryParametersError` when
 anyone tries to use it. Confirmed: `604800` works, `604801` produces a
 dead link. If you need longer than a week, use a bucket and keys instead.
 
-**Staging inside `sebat` is safe.** The signature grants access to that one object
-and nothing else — not the bucket, not the rest of the ~22 TB. You're handing out a
-link, never a key. (Standard data-use rules still apply to whatever is *in* the
+**Staging inside `sebat` is safe.** The signature is bound to the exact object key,
+so it grants that one object and nothing else — not the bucket, not the rest of the
+~22 TB. You're handing out a link, never a key. Verified by tampering: editing a
+working URL to point at a different object, or at the bucket root, returns
+`403 SignatureDoesNotMatch`. (Standard data-use rules still apply to whatever is *in* the
 file; see [Before you start](#before-you-start).)
 
 ### Many files: tar them into one object
@@ -370,6 +372,9 @@ Tested August 2026 against the live server:
   way to probe whether a given bucket exists from outside.
 - Presigned URLs work: HTTP 200 with no credentials, `403` without the
   signature, and a server-enforced 7-day maximum that the CLI does not warn about.
+  Tested end to end, including a `tar.gz` bundle that unpacked intact on the
+  receiving side. Editing a valid URL to point at another object or at the bucket
+  root returns `403 SignatureDoesNotMatch`, so the link cannot be widened.
 - Server-side metadata under `.minio.sys/buckets/<bucket>/` is only created when
   an object is written **through the S3 API**. Files created with `cp`, and
   objects merely read over S3, produce none.
