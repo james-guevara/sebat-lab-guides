@@ -14,6 +14,15 @@ Guides and templates for working with SDSC clusters (Expanse, TSCC), AWS, and AI
 | [Containers on Expanse](containers-expanse.md) | Singularity: why you can't build here, pulling as a job, the `procps` trap |
 | [Claude Code on Clusters](claude-code-cluster.md) | Installing and using Claude Code via SSH |
 
+## Pipeline runbooks
+
+Guides here cover cluster *tooling*. Runbooks for specific pipelines live with the
+pipeline, so the commands can't drift from the code:
+
+| Pipeline | Runbook |
+|---|---|
+| Rare variant (G2MH) | [rare-variant-pipeline/docs/running-g2mh.md](https://github.com/james-guevara/rare-variant-pipeline/blob/main/docs/running-g2mh.md) |
+
 ## For Claude Code Users
 
 These guides can be:
