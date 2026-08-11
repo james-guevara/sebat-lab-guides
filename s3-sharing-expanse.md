@@ -23,6 +23,36 @@ The only thing that genuinely requires an SDSC ticket is **creating the access
 keys** for a new bucket. Creating the bucket itself is just `mkdir` — see
 [Verified behaviour](#verified-behaviour).
 
+## The bucket and your project directory are the same storage
+
+`/expanse/projects/sebat1/s3/data/sebat/<path>` and `s3://sebat/<path>` are two views
+of the same bytes. A file written on Expanse is immediately listable and presignable
+over S3 — **there is nothing to upload.**
+
+```bash
+# written on Expanse a minute ago...
+ls /expanse/projects/sebat1/s3/data/sebat/some/dir/file.sif
+# ...already an object
+aws --profile sebat --endpoint-url https://sebat.s3.sdsc.edu s3 ls s3://sebat/some/dir/
+```
+
+Two consequences:
+
+**Don't `aws s3 cp` files that are already under that path.** You would just create a
+second copy at a different key, paying for the transfer and creating something that can
+drift from the original.
+
+**Symlinks are not S3 objects.** If the filesystem path is a symlink, the corresponding
+key does not exist — `head-object` returns nothing even though `ls -l` looks fine on
+Expanse. Presign the *target* path instead:
+
+```bash
+# resolve first, then presign the real key
+readlink -f /expanse/projects/sebat1/s3/data/sebat/dir/link_name
+```
+
+(This is the same reason copies to other Expanse users need `rsync --copy-links`.)
+
 ## Why this works
 
 SDSC runs an S3 server (MinIO) on top of our project storage. Files you copy
