@@ -167,12 +167,50 @@ sbatch --test-only scan.sh /expanse/projects/sebat1/some_dir
 
 ### Querying it
 
-`duckdb` is not on `PATH` as a binary, but the standard env has the Python
-package (`duckdb 1.4.3`, `polars 1.40.1`):
+`duckdb` is not installed on Expanse. The simplest fix needs no environment, no
+module, and no root — the CLI is one self-contained binary:
 
 ```bash
-eval "$(micromamba shell hook --shell bash)"
-micromamba activate python3.12_env_default
+cd ~/size_scans
+curl -sSL -O https://github.com/duckdb/duckdb/releases/latest/download/duckdb_cli-linux-amd64.zip
+unzip -q duckdb_cli-linux-amd64.zip     # -> ./duckdb  (~21 MB download)
+./duckdb --version                       # v1.5.5 as of 2026-08
+```
+
+Save the schema once as `schema.sql`, adjusting the path:
+
+```sql
+SET memory_limit='2GB';
+SET threads=2;
+SET preserve_insertion_order=false;
+
+CREATE VIEW m AS
+SELECT * FROM read_csv('manifest.tsv', delim='\t', header=false, quote='',
+                       columns={
+                         'size':'BIGINT','blocks':'BIGINT','mtime':'DOUBLE',
+                         'atime':'DOUBLE','ctime':'DOUBLE','uid':'INT','gid':'INT',
+                         'mode':'VARCHAR','inode':'BIGINT','nlink':'INT',
+                         'ftype':'VARCHAR','path':'VARCHAR','linktarget':'VARCHAR'
+                       });
+```
+
+Then run any query in this guide against it:
+
+```bash
+./duckdb -init schema.sql -c "SELECT count(*) FROM m;"
+```
+
+The three `SET` lines are not optional on a login node — see [Gotchas](#gotchas).
+
+<details>
+<summary>Alternative: the Python package, if you already keep an environment</summary>
+
+`duckdb` and `polars` install cleanly into a micromamba env (see
+[nextflow-expanse.md](nextflow-expanse.md) for installing micromamba itself):
+
+```bash
+micromamba create -n dataquery -c conda-forge python=3.12 duckdb polars
+micromamba activate dataquery
 ```
 
 ```python
@@ -200,13 +238,15 @@ SCHEMA_SQL = """
 db.execute(SCHEMA_SQL.replace("__MANIFEST__", "manifest.tsv"))
 ```
 
-Two things that will bite you if you rewrite this snippet:
+Three things that will bite you if you rewrite this snippet:
 
 - **`read_csv`'s path cannot be a bound parameter** inside `CREATE VIEW`. Passing it
   as `?` raises `Binder Error: Unexpected prepared parameter`. Interpolate it.
 - **Don't make it an f-string** — every brace of the `columns={...}` dict would have
   to be doubled. The `__MANIFEST__` placeholder avoids both traps.
 - **`quote=''`** matters: paths containing `"` would otherwise be misparsed.
+
+</details>
 
 **What kind of data is it?** Compound extensions are handled so `.g.vcf.gz`
 doesn't collapse into `.gz`:
