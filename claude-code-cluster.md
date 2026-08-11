@@ -79,6 +79,32 @@ claude -p "Analyze the VCF files in this directory" --allowedTools "Read,Grep,Ba
 claude -p "Summarize the results in results.txt" --allowedTools "Read"
 ```
 
+### Skipping permission prompts
+
+In a batch job there is no terminal to approve tool use, so Claude Code will
+block on the first prompt and the job burns walltime doing nothing. Two ways
+around that, narrowest first:
+
+```bash
+# Preferred: grant exactly the tools the job needs
+claude -p "Summarize results.txt" --allowedTools "Read,Grep"
+
+# Blanket: skip every permission prompt
+claude --dangerously-skip-permissions
+```
+
+`--dangerously-skip-permissions` does what the name says — **every** tool call
+runs without asking, including `rm -rf`, `scancel`, and overwriting files. It is
+the right flag for an unattended job in a scratch directory you can afford to
+lose, and the wrong flag for an interactive session sitting in shared project
+space. The narrower `--allowedTools` grant is usually enough for batch work.
+
+If you do use it, keep the blast radius small:
+
+- run it from a working directory that contains only disposable data
+- avoid it in any session that can reach `/expanse/projects/sebat1` shared folders
+- never combine it with a prompt that implies bulk deletion or `scancel`
+
 ## Using with SSH Multiplexing
 
 If you're running Claude Code on your **local machine** and want it to SSH to the cluster:
