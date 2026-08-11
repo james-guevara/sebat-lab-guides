@@ -106,6 +106,57 @@ Worth asserting it at build time so a later base-image change can't reintroduce 
 RUN command -v ps >/dev/null || { echo "procps missing — Nextflow needs ps"; exit 1; }
 ```
 
+## 4. Containerizing can silently swap GNU coreutils for BusyBox
+
+This one cost the most, because it fails *quietly*. Many biocontainers ship BusyBox
+rather than GNU coreutils — `/bin/{sort,split,head,tail}` turn out to be one multi-call
+binary:
+
+```
+$ singularity exec bcftools:1.22.sif ls -l /bin/sort /bin/split
+-rwxr-xr-x  380 root root 812456 ... /bin/sort     # same
+-rwxr-xr-x  380 root root 812456 ... /bin/split    # binary
+$ singularity exec bcftools:1.22.sif sort --version
+sort: unrecognized option '--version'
+```
+
+BusyBox does not implement GNU-only flags, and does not always fail loudly:
+
+| Command | BusyBox behaviour |
+|---|---|
+| `sort --parallel=8 -S 4G` | **silently outputs nothing, exits 0** |
+| `split -d --additional-suffix=.bed` | `split: invalid option -- 'd'`, no files |
+| `head -1`, `tail -n +2` | fine |
+
+The `sort` case is the dangerous one. In a pipeline like
+
+```bash
+(head -1 f; tail -n +2 f | sort --parallel=8 -S 4G -k1,1 -k2,2n) | bgzip > out.gz
+```
+
+`sort` emits nothing, `bgzip` writes a header-only file and exits 0, and the stage
+"succeeds" having thrown away all the data. Downstream steps then process an empty file
+and also succeed. Nothing in any log mentions a problem.
+
+Three defences, worth applying together:
+
+1. **Don't use GNU-only flags** in containerized commands. `--parallel`, `-S`,
+   `split -d`, `--additional-suffix`, `sort -h` and long options generally. `awk` is a
+   safer chunker than `split` because it's specified behaviour either way.
+2. **`set -o pipefail`.** Nextflow runs `.command.sh` under `bash -ue`, which does *not*
+   fail when a non-final pipe stage dies.
+3. **Assert the output.** A row-count check costs nothing and converts silent loss into
+   a failed task:
+
+```bash
+n_in=$(wc -l < in.tsv); n_out=$(zcat out.gz | wc -l)
+[ "$n_out" -eq "$n_in" ] || { echo "lost rows: $n_in -> $n_out" >&2; exit 1; }
+```
+
+Beware that small test cases can hide this. A chunker guarded by
+`if [ $n -le $chunk_size ]; then cp ...; else split ...; fi` never calls `split` on a
+small chromosome, so a smoke test passes and the first real chromosome fails.
+
 ## 4. BLAS-linked tools need their thread count capped
 
 Some containers (bcftools builds linked against OpenBLAS, for one) size per-thread
