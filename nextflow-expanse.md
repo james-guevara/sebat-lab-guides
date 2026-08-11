@@ -30,6 +30,20 @@ export NXF_TEMP=/expanse/projects/sebat1/$USER/nextflow_temp
 mkdir -p $NXF_TEMP
 ```
 
+### 4. If your pipeline uses containers
+
+Any image Nextflow runs must contain `procps`. Without it every task fails with an
+empty `.command.out` and only this in `.command.err`:
+
+```
+Command 'ps' required by nextflow to collect task metrics cannot be found
+```
+
+Nextflow shells out to `ps` for task metrics and aborts when it's missing, so your
+script never runs and the error says nothing about your code. See
+[Containers on Expanse](containers-expanse.md) — which also covers why you can't
+build images on Expanse, and why `singularity pull` has to run as a batch job.
+
 ## Running Pipelines
 
 ### Interactive (for testing)

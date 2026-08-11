@@ -11,6 +11,7 @@ Guides and templates for working with SDSC clusters (Expanse, TSCC), AWS, and AI
 | [Nextflow on Expanse](nextflow-expanse.md) | Running Nextflow pipelines on the cluster |
 | [Globus Setup](globus-expanse.md) | File transfers with Globus CLI |
 | [Sharing Data via S3](s3-sharing-expanse.md) | Send data to outside collaborators — presigned links, or a bucket with scoped keys |
+| [Containers on Expanse](containers-expanse.md) | Singularity: why you can't build here, pulling as a job, the `procps` trap |
 | [Claude Code on Clusters](claude-code-cluster.md) | Installing and using Claude Code via SSH |
 
 ## For Claude Code Users
