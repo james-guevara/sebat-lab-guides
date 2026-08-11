@@ -1,6 +1,6 @@
 # Containers on Expanse
 
-Using Singularity/Apptainer containers on SDSC Expanse, and the four things that
+Using Singularity/Apptainer containers on SDSC Expanse, and the five things that
 waste a day if you don't know them up front.
 
 ## The short version
@@ -10,6 +10,7 @@ waste a day if you don't know them up front.
 | Get an existing image | `singularity pull` — **as a batch job**, not on a login node |
 | Build your own image | **Not on Expanse.** Build it elsewhere (CI) and pull the result |
 | Use it with Nextflow | Make sure the image contains `procps`, or every task fails |
+| Run shell tools inside it | Check whether its coreutils are BusyBox — GNU-only flags can fail **silently** |
 
 ## 1. You cannot build images on Expanse
 
@@ -157,7 +158,7 @@ Beware that small test cases can hide this. A chunker guarded by
 `if [ $n -le $chunk_size ]; then cp ...; else split ...; fi` never calls `split` on a
 small chromosome, so a smoke test passes and the first real chromosome fails.
 
-## 4. BLAS-linked tools need their thread count capped
+## 5. BLAS-linked tools need their thread count capped
 
 Some containers (bcftools builds linked against OpenBLAS, for one) size per-thread
 buffers from the host's core count. On a many-core login node that overshoots:
