@@ -13,6 +13,8 @@ Guides and templates for working with SDSC clusters (Expanse, TSCC), AWS, and AI
 | [Sharing Data via S3](s3-sharing-expanse.md) | Send data to outside collaborators — presigned links, or a bucket with scoped keys |
 | [Containers on Expanse](containers-expanse.md) | Singularity: why you can't build here, pulling as a job, the `procps` trap |
 | [Measuring Storage](filesize-expanse.md) | How big is it, what *is* it, what can I delete — quotas, `diskus`, manifests, S3 inventory |
+| [AWS for the Lab](aws-setup.md) | Profiles, instance roles, cross-account S3, ECR, and cost guardrails |
+| [Nextflow on AWS Batch](nextflow-aws-batch.md) | Porting a SLURM pipeline: the cgroup trap, staging, spot vs on-demand |
 | [Claude Code on Clusters](claude-code-cluster.md) | Installing and using Claude Code via SSH |
 | [Working Habits](working-habits.md) | One person's opinions on cluster hygiene, verification, and tooling — take or leave |
 
