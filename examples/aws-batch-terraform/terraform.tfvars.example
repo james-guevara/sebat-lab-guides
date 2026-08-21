@@ -1,0 +1,13 @@
+aws_region = "us-east-1"
+
+project_name = "example-batch"
+
+subnet_ids = [
+  "subnet-replace-me",
+]
+
+security_group_ids = [
+  "sg-replace-me",
+]
+
+max_vcpus = 8
