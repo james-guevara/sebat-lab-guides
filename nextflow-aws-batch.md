@@ -363,5 +363,8 @@ reclaim loses one sample instead of twenty.
 ## See also
 
 - [AWS for the Lab](aws-setup.md) — profiles, roles, ECR, cost guardrails
+- [Terraform for AWS](terraform-aws.md) — provision and review Batch infrastructure
+- [FSx for Lustre with Batch](fsx-aws.md) — shared storage for repeated large reads
+- [Moving Data in AWS](data-movement-aws.md) — staging, verification, and egress
 - [Nextflow on Expanse](nextflow-expanse.md) — the SLURM equivalent
 - [Working Habits](working-habits.md) — on verifying rather than assuming
