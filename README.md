@@ -10,6 +10,7 @@ Guides and templates for working with SDSC clusters (Expanse, TSCC), AWS, and AI
 | [SLURM on Expanse](slurm-expanse.md) | Job submission templates and tips |
 | [Nextflow on Expanse](nextflow-expanse.md) | Running Nextflow pipelines on the cluster |
 | [Globus Setup](globus-expanse.md) | File transfers with Globus CLI |
+| [Archival Storage via Globus](globus-archive.md) | SDSC RDS archive paths, authentication, and restoring data to Expanse |
 | [Sharing Data via S3](s3-sharing-expanse.md) | Send data to outside collaborators — presigned links, or a bucket with scoped keys |
 | [Containers on Expanse](containers-expanse.md) | Singularity: why you can't build here, pulling as a job, the `procps` trap |
 | [Measuring Storage](filesize-expanse.md) | How big is it, what *is* it, what can I delete — quotas, `diskus`, manifests, S3 inventory |

@@ -2,6 +2,8 @@
 
 Setting up Globus for file transfers on SDSC Expanse.
 
+For archived lab data and archive-to-project restores, see [Archival Storage via Globus](globus-archive.md).
+
 ## Why Globus?
 
 - Transfers resume automatically if interrupted
