@@ -70,6 +70,50 @@ There is no `ind-large-shared`; the lab has no access to the 2TB `large-shared` 
 Your memory ceiling is **249325M on `ind-shared`**. Request more and you get
 `Requested node configuration is not available`.
 
+## Limits, and getting past 16 nodes with multi-node jobs
+
+The partitions have **different QOS limits** (checked 2026-11-05 with
+`sacctmgr -n -P show qos ind-normal,ind-shared-normal format=Name,MaxJobsPU,MaxSubmitPU,MaxTRESPU,MaxTRESPA`):
+
+| QOS (partition) | Running jobs / user | Queued jobs / user | Nodes / user and / account | Cores / user and / account |
+|---|---|---|---|---|
+| `ind-shared-normal` (`ind-shared`) | 2048 | 2048 | **16** | 2048 |
+| `ind-normal` (`ind-compute`) | **16** | 32 | **32** | 4096 |
+
+- On `ind-shared` the **account** may hold at most 16 nodes. Many small jobs land on many
+  different nodes, so one person's array can fill all 16 and everyone else in `ddp195`
+  waits with reason `MaxNodePerAccount`.
+- On `ind-compute` the binding limit is **16 running jobs per user**, not nodes. Sixteen
+  one-node jobs give you 16 nodes, even though the account may use 32.
+
+**The trick:** ask for 2 nodes per job on `ind-compute`. Twelve 2-node jobs give you
+24 nodes (3,072 cores), still under the 32-node / 4,096-core cap, with job slots
+and nodes left over for the rest of the lab. Run one worker per node with `srun`:
+
+```bash
+#SBATCH --partition=ind-compute
+#SBATCH --qos=ind-normal
+#SBATCH --nodes=2
+#SBATCH --ntasks=2
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=128
+#SBATCH --mem=240G            # per node
+srun --ntasks=2 --ntasks-per-node=1 --cpus-per-task=128 bash -c 'my_worker.sh'
+```
+
+The two workers must not do the same work. In the ConGA nulls each worker walks the
+same task list and claims a line atomically before running it (`mkdir claims/<line>`
+succeeds for exactly one worker); see `ConGA-CNV-2026_fresh/pipeline/fresh/null_node2.sbatch`
+and `null_task.sh`. Check both hosts are busy before scaling up:
+`srun --jobid=<id> --overlap -N2 --ntasks=2 --ntasks-per-node=1 bash -c 'hostname; pgrep -c -u $USER <program>'`.
+
+**Etiquette (Jon, 2026-11):** leave room for others. Cap yourself below the account limit
+(the ConGA run used 24 of 32 `ind-compute` nodes and at most 6 of 16 `ind-shared` nodes),
+use `--nice`, never fill `ind-shared` with small-task arrays, and add nothing while
+another `ddp195` user has a job pending on an account cap in the same partition:
+`squeue -A ddp195 -p <partition> -t PD -o "%u %i %r"` (reasons `MaxNodePerAccount`,
+`AssocGrp*`).
+
 ## Common Templates
 
 ### Basic single-core job
