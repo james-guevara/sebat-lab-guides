@@ -118,7 +118,7 @@ nextflow run pipeline.nf -resume
 // nextflow.config
 process {
     executor = 'slurm'
-    queue = 'shared'
+    queue = 'ind-shared'
     clusterOptions = '--account=ddp195'
 
     // Default resources
